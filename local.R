@@ -1,0 +1,17 @@
+install.packages(c(
+  "fst",
+  "fs",
+  "keras",
+  "recipes",
+  "remotes",
+  "rmarkdown",
+  "rprojroot",
+  "rsample",
+  "tidyverse",
+  "visNetwork",
+  "yardstick"
+))
+remotes::install_github("wlandau/targets")
+remotes::install_github("wlandau/tarchetypes")
+# reticulate::install_miniconda()
+# keras::install_keras()
