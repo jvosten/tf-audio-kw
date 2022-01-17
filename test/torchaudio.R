@@ -224,12 +224,12 @@ x <- df_validation %>%
   mutate(correct = pred_class == class) %>%
   count(pred_class, class, correct)
 
-
-alluvial(
-  x %>% select(class, pred_class),
-  freq = x$n,
-  col = ifelse(x$correct, "lightblue", "red"),
-  border = ifelse(x$correct, "lightblue", "red"),
-  alpha = 0.6,
-  hide = x$n < 20
-)
+#
+# alluvial(
+#   x %>% select(class, pred_class),
+#   freq = x$n,
+#   col = ifelse(x$correct, "lightblue", "red"),
+#   border = ifelse(x$correct, "lightblue", "red"),
+#   alpha = 0.6,
+#   hide = x$n < 20
+# )

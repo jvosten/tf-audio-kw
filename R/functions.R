@@ -30,8 +30,8 @@ prep_tbl <- function(path) {
 #' @title Dataset generator
 #' @description define a function called data_generator that will create the
 #' generator depending on specified inputs.
-#' @return An `environment` that definies how the TensorFlow graph should read
-#' and pre-process data.
+#' @return A function that defines how the TensorFlow graph should read
+#' and pre-process data. Not compiled or run yet.
 #' @param generator_prep A `tibble` generated from [prep_tbl()]
 #' @param batch_size
 #' @param window_size_ms
@@ -40,7 +40,7 @@ prep_tbl <- function(path) {
 #' @examples
 #' library(tfdatasets)
 data_generator <- function(df,
-                           batch_size,
+                           batch_size = 32,
                            window_size_ms,
                            window_stride_ms,
                            shuffle = TRUE) {
@@ -112,47 +112,113 @@ data_generator <- function(df,
   ds
 }
 
+#' @title Train set sampler
+#' @description generates a sample of IDs of 70% of the data set for
+#' the data set split
+#' @return A vector
+#' @param generator_prep A `tibble` generated from [prep_tbl()]
+#' @examples
+#' tbc
+id_sampler <- function(df) {
+  sample(nrow(df), size = 0.7*nrow(df))
+}
+
+#' @title Test set generator
+#' @description define a function called ds_train that will create the
+#' generator depending on specified inputs.
+#' @return A tf_dataset object defines how the TensorFlow graph should read
+#' and pre-process test data. Not compiled or run yet.
+#' @param generator_prep A `tibble` generated from [prep_tbl()]
+#' @param batch_size
+#' @param window_size_ms
+#' @param window_stride_ms
+#' @param shuffle
+#' @examples
+#' library(tfdatasets)
+ds_train <- data_generator(
+  df[id_train,],
+  batch_size = 32,
+  window_size_ms = 30,
+  window_stride_ms = 10
+)
+
+#' @title Validation set generator
+#' @description Define a function called ds_validation that will create the
+#' generator depending on specified inputs.
+#' @return A tf_dataset object defines how the TensorFlow graph should read
+#' and pre-process validation data. Not compiled or run yet.
+#' @param generator_prep A `tibble` generated from [prep_tbl()]
+#' @param batch_size
+#' @param window_size_ms
+#' @param window_stride_ms
+#' @param shuffle
+#' @examples
+#' library(tfdatasets)
+#' tbc
+ds_validation <- data_generator(
+  df[-id_train,],
+  batch_size = 32,
+  shuffle = FALSE,
+  window_size_ms = 30,
+  window_stride_ms = 10
+)
+
 #' @title Define a Keras model.
 #' @description Define a Keras model for the customer churn data.
 #' @return A Keras model. Not compiled or run yet.
-#' @param churn_recipe A `recipe` object from [prepare_recipe()].
-#' @param units1 Number of neurons in the first layer.
-#' @param units2 Number of neurons in the second layer.
-#' @param act1 Activation function for layer 1.
-#' @param act2 Activation function for layer 2.
-#' @param act3 Activation function for layer 3.
+#' @param window_size_ms
+#' @param window_stride_ms
 #' @examples
 #' library(keras)
-#' library(recipes)
-#' library(rsample)
-#' library(tidyverse)
-#' data <- split_data("data/customer_churn.csv")
-#' recipe <- prepare_recipe(data)
-#' model <- define_model(recipe, 16, 16, "relu", "relu", "sigmoid")
+#' library(tfdatasets)
+#' model <- define_model(n_chunks, fft_size)
 #' model
-define_model <- function(churn_recipe, units1, units2, act1, act2, act3) {
-  input_shape <- ncol(
-    juice(churn_recipe, all_predictors(), composition = "matrix")
-  )
+define_model <- function(
+  window_size_ms,
+  window_stride_ms
+) {
+  window_size <- as.integer(16000*window_size_ms/1000)
+  stride <- as.integer(16000*window_stride_ms/1000)
+  fft_size <- as.integer(2^trunc(log(window_size, 2)) + 1)
+  n_chunks <- length(seq(window_size/2, 16000 - window_size/2, stride))
+
   keras_model_sequential() %>%
+    layer_conv_2d(
+      input_shape = c(n_chunks, fft_size, 1),
+      filters = 32,
+      kernel_size = c(3,3),
+      activation = 'relu'
+      ) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(
+      filters = 64,
+      kernel_size = c(3,3),
+      activation = 'relu'
+      ) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(
+      filters = 128,
+      kernel_size = c(3,3),
+      activation = 'relu'
+      ) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_conv_2d(
+      filters = 256,
+      kernel_size = c(3,3),
+      activation = 'relu'
+      ) %>%
+    layer_max_pooling_2d(pool_size = c(2, 2)) %>%
+    layer_dropout(rate = 0.25) %>%
+    layer_flatten() %>%
     layer_dense(
-      units = units1,
-      kernel_initializer = "uniform",
-      activation = act1,
-      input_shape = input_shape
-    ) %>%
-    layer_dropout(rate = 0.1) %>%
+      units = 128,
+      activation = 'relu'
+      ) %>%
+    layer_dropout(rate = 0.5) %>%
     layer_dense(
-      units = units2,
-      kernel_initializer = "uniform",
-      activation = act2
-    ) %>%
-    layer_dropout(rate = 0.1) %>%
-    layer_dense(
-      units = 1,
-      kernel_initializer = "uniform",
-      activation = act3
-    )
+      units = 30,
+      activation = 'softmax'
+      )
 }
 
 #' @title Define, compile, and train a Keras model.
@@ -164,44 +230,37 @@ define_model <- function(churn_recipe, units1, units2, act1, act2, act3) {
 #'   and "OMP: Info #171: KMP_AFFINITY:". You can safely ignore these messages.
 #' @return A trained Keras model.
 #' @inheritParams define_model
+#' @param df
+#' @param ds_train
+#' @param ds_validate
 #' @examples
 #' library(keras)
-#' library(recipes)
-#' library(rsample)
-#' library(tidyverse)
-#' data <- split_data("data/customer_churn.csv")
-#' recipe <- prepare_recipe(data)
-#' train_model(recipe, 16, 16, "relu", "relu", "sigmoid")
+#' library(tfdatasets)
+#' tbc
 train_model <- function(
-  churn_recipe,
-  units1 = 16,
-  units2 = 16,
-  act1 = "relu",
-  act2 = "relu",
-  act3 = "sigmoid"
+  df,
+  window_size_ms,
+  window_stride_ms,
+  ds_train,
+  ds_validation,
 ) {
-  model <- define_model(churn_recipe, units1, units2, act1, act2, act3)
+  model <- define_model(window_size_ms,
+                        window_stride_ms)
+
   compile(
     model,
-    optimizer = "adam",
-    loss = "binary_crossentropy",
-    metrics = c("accuracy")
+    loss = loss_categorical_crossentropy,
+    optimizer = optimizer_adadelta(),
+    metrics = c('accuracy')
   )
-  x_train_tbl <- juice(
-    churn_recipe,
-    all_predictors(),
-    composition = "matrix"
-  )
-  y_train_vec <- juice(churn_recipe, all_outcomes()) %>%
-    pull()
+
   fit(
     object = model,
-    x = x_train_tbl,
-    y = y_train_vec,
-    batch_size = 32,
-    epochs = 32,
-    validation_split = 0.3,
-    verbose = 0
+    generator = ds_train,
+    steps_per_epoch = 0.7*nrow(df)/32,
+    epochs = 10,
+    validation_data = ds_validation,
+    validation_steps = 0.3*nrow(df)/32
   )
   model
 }
@@ -214,14 +273,6 @@ train_model <- function(
 #' @inheritParams define_model
 #' @examples
 #' library(keras)
-#' library(recipes)
-#' library(rsample)
-#' library(tidyverse)
-#' library(yardstick)
-#' data <- split_data("data/customer_churn.csv")
-#' recipe <- prepare_recipe(data)
-#' model <- train_model(recipe, 16, 16, "relu", "relu", "sigmoid")
-#' test_accuracy(data, recipe, model)
 test_accuracy <- function(churn_data, churn_recipe, model) {
   testing_data <- bake(churn_recipe, testing(churn_data))
   x_test_tbl <- testing_data %>%
