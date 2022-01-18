@@ -1,11 +1,12 @@
 ---
 title: "Keras results"
-output: html_document
+output: pdf_document
 ---
 The goal of this workflow is  build a deep learning model to classify words. We will use the [Speech Commands dataset](https://www.tensorflow.org/datasets/catalog/speech_commands) which consists of 65,000 one-second audio files of people saying 30 different words. Here fit multiple Keras models to the dataset with different tuning parameters, pick the one with the highest classification test accuracy, and produce a trained model for the best set of tuning parameters we find. This eample is based on [this](https://blogs.rstudio.com/ai/posts/2018-06-06-simple-audio-classification-keras/) and [this](https://blogs.rstudio.com/ai/posts/2019-02-07-audio-background/) blog post from the [RStudio AI Blog](https://blogs.rstudio.com/ai/) and the [targets-keras](https://github.com/wlandau/targets-keras) by W. Landau.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.align="center")
 options(tidyverse.quiet = TRUE)
 ```
 
@@ -28,7 +29,11 @@ tar_read(model)
 
 A nice visualization of the resulting confusion matrix is to create an alluvial diagram:
 
-![](./output/alluvial.png)
+<!-- ![](./output/alluvial.png){width=350px} -->
+
+```{r, echo=FALSE, fig.align='center'}
+knitr::include_graphics("./output/alluvial.png", dpi = 150)
+```
 
 We can see from the diagram that the most relevant mistake our model makes is to classify “tree” as “three”. There are other common errors like classifying “go” as “no”, “up” as “off”. At 93% accuracy for 30 classes, and considering the errors we can say that this model is pretty reasonable.
 
