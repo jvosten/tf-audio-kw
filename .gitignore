@@ -11,3 +11,4 @@ staging/
 .DS_Store
 data/
 test/
+NAMESPACE
