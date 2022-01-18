@@ -1,0 +1,8 @@
+name: tf-audio
+channels:
+  - defaults
+dependencies:
+  - pip=21.2
+  - python=3.9
+  - pip:
+    - tensorflow==2.7.0

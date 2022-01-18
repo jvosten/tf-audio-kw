@@ -1,0 +1,19 @@
+name|type|data|command|depend|seed|path|time|size|bytes|format|iteration|parent|children|seconds|warnings|error
+window_size_ms|stem|b6bc0ac94b8e9219|a9ab0bab79600a30|a3dad144c40657ed|16306858||t19010.7599366222s|b6d2e014b07bc296|51|rds|vector|||0||
+window_stride_ms|stem|044c9e5d6d71d508|66c0434d17748906|a3dad144c40657ed|814793603||t19010.7599366608s|b6d2e014b07bc296|51|rds|vector|||0||
+gen_prep|stem|6a428ae053aeea98|26825892a5abd9e0|495296366fa6303d|-1818050584||t19010.7599396315s|4069876482915f2f|3044547|fst_tbl|vector|||0.222||
+id_train|stem|809879d90ff95847|4c25ee17a69578fe|f4e996c6d0d0a1b8|854842129||t19010.759939863s|918f39a68922db77|104395|qs|vector|||0.002||
+model|stem|7b20ef4b58706666|df6d0529f4ccfe0e|cc702de96c9caf21|1816327236||t19010.763148505s|1b132a15d4be6cd9|26787936|keras|vector|||277.168|fit_generator is deprecated. Use fit instead, it now accept generators.|
+predictions|stem|d1121b4e7ea42f58|0bd1bcb345bf53e0|c77488fd0f6d8a63|-1904676269||t19010.7632079958s|9967b3cd579e7cef|100511|qs|vector|||4.828|predict_generator is deprecated. Use predict instead, it now accept generators.|
+alluvial_plot|stem|3d94058d56131238|ede9c2989e2bde56|5962ce44267af1e0|1808674391||t19010.7632086131s|40b3a10246f0095b|83|rds|vector|||0.05||
+data_generator|function|fe8c98b6d3b1bd62||||||||||||||
+prep_tbl|function|2c4ad17df1e7cb4b||||||||||||||
+define_model|function|f0a58716e73443d8||||||||||||||
+predicting|function|9ae13f13f757078d||||||||||||||
+id_sampler|function|e63cfdcacc52e434||||||||||||||
+alluv_plot|function|42fc9e6edce1d44a||||||||||||||
+ds_validation|function|5025d84532f628fc||||||||||||||
+ds_train|function|37715c2c14d2a836||||||||||||||
+train_model|function|3f7d6515e30b25c3||||||||||||||
+data_path|stem|a30f95689de2878f|a6a3dd96f3f39f76|ef46db3751d8e999|1349504789|~/src/dev/r/kenwave/data/speech_commands_v0.01/|t17632.7398611111s|a75e104011428481|4096|file|vector|||0.615||
+report|stem|39033f83904b068b|dd8b90762f1a0d88|772a572289974f09|-237041703|report.html*report.Rmd|t19010.8046144788s|56210d6e85961590|811448|file|vector|||0.423||

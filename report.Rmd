@@ -1,0 +1,35 @@
+---
+title: "Keras results"
+output: html_document
+---
+The goal of this workflow is  build a deep learning model to classify words. We will use the [Speech Commands dataset](https://www.tensorflow.org/datasets/catalog/speech_commands) which consists of 65,000 one-second audio files of people saying 30 different words. Here fit multiple Keras models to the dataset with different tuning parameters, pick the one with the highest classification test accuracy, and produce a trained model for the best set of tuning parameters we find. This eample is based on [this](https://blogs.rstudio.com/ai/posts/2018-06-06-simple-audio-classification-keras/) and [this](https://blogs.rstudio.com/ai/posts/2019-02-07-audio-background/) blog post from the [RStudio AI Blog](https://blogs.rstudio.com/ai/) and the [targets-keras](https://github.com/wlandau/targets-keras) by W. Landau.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(tidyverse.quiet = TRUE)
+```
+
+Many deep learning models are end-to-end, i.e. we let the model learn useful representations directly from the raw data. However, audio data grows very fast - 16,000 samples per second with a very rich structure at many time-scales. In order to avoid having to deal with raw wave sound data, researchers usually use some kind of feature engineering.
+
+Every sound wave can be represented by its spectrum, and digitally it can be computed using the Fast Fourier Transform (FFT).
+
+A common way to represent audio data is to break it into small chunks, which usually overlap. For each chunk we use the FFT to calculate the magnitude of the frequency spectrum. The spectra are then combined, side by side, to form what we call a spectrogram.
+
+It’s also common for speech recognition systems to further transform the spectrum and compute the Mel-Frequency Cepstral Coefficients. This transformation takes into account that the human ear can’t discern the difference between two closely spaced frequencies and smartly creates bins on the frequency axis.
+
+After this procedure, we have an image for each audio sample and we can use convolutional neural networks, the standard architecture type in image recognition models.
+
+After data preprocessing (for more detailed specification see [here](https://blogs.rstudio.com/ai/posts/2018-06-06-simple-audio-classification-keras/#generator)) we definie the following model and train it:
+
+```{r, include=TRUE, eval=TRUE}
+library(targets)
+tar_read(model)
+```
+
+A nice visualization of the resulting confusion matrix is to create an alluvial diagram:
+
+![](./output/alluvial.png)
+
+We can see from the diagram that the most relevant mistake our model makes is to classify “tree” as “three”. There are other common errors like classifying “go” as “no”, “up” as “off”. At 93% accuracy for 30 classes, and considering the errors we can say that this model is pretty reasonable.
+
+The saved model occupies 25Mb of disk space, which is reasonable for a desktop but may not be on small devices. We could train a smaller model, with fewer layers, and see how much the performance decreases.

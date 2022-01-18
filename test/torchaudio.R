@@ -191,7 +191,7 @@ model %>% compile(
 
 
 
-model %>% fit(
+model %>% fit_generator(
   generator = ds_train,
   steps_per_epoch = 0.7*nrow(df)/32,
   epochs = 10,
@@ -203,8 +203,6 @@ model %>% fit(
 df_validation <- df[-id_train,]
 n_steps <- nrow(df_validation)/32 + 1
 
-
-
 predictions <- predict(
   model,
   ds_validation,
@@ -213,7 +211,7 @@ predictions <- predict(
 
 str(predictions)
 
-
+classes <- apply(predictions, 1, which.max) - 1
 
 x <- df_validation %>%
   mutate(pred_class_id = head(classes, nrow(df_validation))) %>%
@@ -224,12 +222,12 @@ x <- df_validation %>%
   mutate(correct = pred_class == class) %>%
   count(pred_class, class, correct)
 
-#
-# alluvial(
-#   x %>% select(class, pred_class),
-#   freq = x$n,
-#   col = ifelse(x$correct, "lightblue", "red"),
-#   border = ifelse(x$correct, "lightblue", "red"),
-#   alpha = 0.6,
-#   hide = x$n < 20
-# )
+
+alluvial(
+  x %>% select(class, pred_class),
+  freq = x$n,
+  col = ifelse(x$correct, "lightblue", "red"),
+  border = ifelse(x$correct, "lightblue", "red"),
+  alpha = 0.6,
+  hide = x$n < 20
+)

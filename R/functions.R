@@ -27,6 +27,17 @@ prep_tbl <- function(path) {
   )
 }
 
+#' @title Train set sampler
+#' @description generates a sample of IDs of 70% of the data set for
+#' the data set split
+#' @return A vector
+#' @param generator_prep A `tibble` generated from [prep_tbl()]
+#' @examples
+#' tbc
+id_sampler <- function(df) {
+  as_tibble(as.numeric(sample(nrow(df), size = 0.7*nrow(df))))
+}
+
 #' @title Dataset generator
 #' @description define a function called data_generator that will create the
 #' generator depending on specified inputs.
@@ -46,28 +57,28 @@ data_generator <- function(df,
                            shuffle = TRUE) {
 
   # assume sampling rate is the same in all samples
-  sampling_rate <-
-    tf$audio$decode_wav(tf$io$read_file(tf$reshape(df$fname[[1]], list()))) %>% .$sample_rate
+  sampling_rate <-tensorflow::tf$cast(16000, tensorflow::tf$int32)
 
   samples_per_window <- (sampling_rate * window_size_ms) %/% 1000L
   stride_samples <-  (sampling_rate * window_stride_ms) %/% 1000L
 
   n_periods <-
-    tf$shape(
-      tf$range(
+    tensorflow::tf$shape(
+      tensorflow::tf$range(
         samples_per_window %/% 2L,
         16000L - samples_per_window %/% 2L,
         stride_samples
       )
     )[1] + 1L
 
-  n_fft_coefs <-
-    (2 ^ tf$math$ceil(tf$math$log(
-      tf$cast(samples_per_window, tf$float32)
-    ) / tf$math$log(2)) /
-      2 + 1L) %>% tf$cast(tf$int32)
+  n_fft_coefs <- tensorflow::tf$cast(
+    (2 ^ tensorflow::tf$math$ceil(tensorflow::tf$math$log(
+      tensorflow::tf$cast(samples_per_window, tensorflow::tf$float32)
+    ) / tensorflow::tf$math$log(2)) /
+      2 + 1L),
+    tensorflow::tf$int32)
 
-  ds <- tensor_slices_dataset(df)
+  ds <- tfdatasets::tensor_slices_dataset(df)
 
   if (shuffle == TRUE){
     ds <- ds %>%
@@ -77,20 +88,20 @@ data_generator <- function(df,
   ds <- ds %>%
     dataset_map(function(obs) {
       wav <-
-        tf$audio$decode_wav(tf$io$read_file(tf$reshape(obs$fname, list())))
+        tensorflow::tf$audio$decode_wav(tensorflow::tf$io$read_file(tensorflow::tf$reshape(obs$fname, list())))
       samples <- wav$audio
-      samples <- samples %>% tf$transpose(perm = c(1L, 0L))
+      samples <- samples %>% tensorflow::tf$transpose(perm = c(1L, 0L))
 
-      stft_out <- tf$signal$stft(samples,
-                                 frame_length = samples_per_window,
-                                 frame_step = stride_samples)
+      stft_out <- tensorflow::tf$signal$stft(samples,
+                                             frame_length = samples_per_window,
+                                             frame_step = stride_samples)
 
-      magnitude_spectrograms <- tf$abs(stft_out)
-      log_magnitude_spectrograms <- tf$math$log(magnitude_spectrograms + 1e-6)
+      magnitude_spectrograms <- tensorflow::tf$abs(stft_out)
+      log_magnitude_spectrograms <- tensorflow::tf$math$log(magnitude_spectrograms + 1e-6)
 
-      response <- tf$one_hot(obs$class_id, 30L)
+      response <- tensorflow::tf$one_hot(obs$class_id, 30L)
 
-      input <- tf$transpose(log_magnitude_spectrograms, perm = c(1L, 2L, 0L))
+      input <- tensorflow::tf$transpose(log_magnitude_spectrograms, perm = c(1L, 2L, 0L))
       list(input, response)
     })
 
@@ -101,26 +112,15 @@ data_generator <- function(df,
     dataset_padded_batch(
       batch_size = batch_size,
       padded_shapes = list(
-        tf$stack(list(
+        tensorflow::tf$stack(list(
           n_periods,
           n_fft_coefs,-1L)),
-        tf$constant(-1L,
-                    shape = shape(1L))),
+        tensorflow::tf$constant(-1L,
+                                shape = shape(1L))),
       drop_remainder = TRUE
     )
 
   ds
-}
-
-#' @title Train set sampler
-#' @description generates a sample of IDs of 70% of the data set for
-#' the data set split
-#' @return A vector
-#' @param generator_prep A `tibble` generated from [prep_tbl()]
-#' @examples
-#' tbc
-id_sampler <- function(df) {
-  sample(nrow(df), size = 0.7*nrow(df))
 }
 
 #' @title Test set generator
@@ -135,12 +135,24 @@ id_sampler <- function(df) {
 #' @param shuffle
 #' @examples
 #' library(tfdatasets)
-ds_train <- data_generator(
-  df[id_train,],
+ds_train <- function(
+  df,
+  id_train,
   batch_size = 32,
-  window_size_ms = 30,
-  window_stride_ms = 10
-)
+  window_size_ms,
+  window_stride_ms,
+  shuffle
+) {
+  df <- df[pull(id_train),]
+
+  data_generator(
+    df,
+    batch_size = 32,
+    window_size_ms,
+    window_stride_ms,
+    shuffle = TRUE
+  )
+}
 
 #' @title Validation set generator
 #' @description Define a function called ds_validation that will create the
@@ -155,13 +167,24 @@ ds_train <- data_generator(
 #' @examples
 #' library(tfdatasets)
 #' tbc
-ds_validation <- data_generator(
-  df[-id_train,],
+ds_validation <- function(
+  df,
+  id_train,
   batch_size = 32,
-  shuffle = FALSE,
-  window_size_ms = 30,
-  window_stride_ms = 10
-)
+  window_size_ms,
+  window_stride_ms,
+  shuffle = FALSE
+) {
+  df <- df[-pull(id_train),]
+
+  data_generator(
+    df,
+    batch_size = 32,
+    window_size_ms,
+    window_stride_ms,
+    shuffle = FALSE
+  )
+}
 
 #' @title Define a Keras model.
 #' @description Define a Keras model for the customer churn data.
@@ -188,37 +211,37 @@ define_model <- function(
       filters = 32,
       kernel_size = c(3,3),
       activation = 'relu'
-      ) %>%
+    ) %>%
     layer_max_pooling_2d(pool_size = c(2, 2)) %>%
     layer_conv_2d(
       filters = 64,
       kernel_size = c(3,3),
       activation = 'relu'
-      ) %>%
+    ) %>%
     layer_max_pooling_2d(pool_size = c(2, 2)) %>%
     layer_conv_2d(
       filters = 128,
       kernel_size = c(3,3),
       activation = 'relu'
-      ) %>%
+    ) %>%
     layer_max_pooling_2d(pool_size = c(2, 2)) %>%
     layer_conv_2d(
       filters = 256,
       kernel_size = c(3,3),
       activation = 'relu'
-      ) %>%
+    ) %>%
     layer_max_pooling_2d(pool_size = c(2, 2)) %>%
     layer_dropout(rate = 0.25) %>%
     layer_flatten() %>%
     layer_dense(
       units = 128,
       activation = 'relu'
-      ) %>%
+    ) %>%
     layer_dropout(rate = 0.5) %>%
     layer_dense(
       units = 30,
       activation = 'softmax'
-      )
+    )
 }
 
 #' @title Define, compile, and train a Keras model.
@@ -239,13 +262,31 @@ define_model <- function(
 #' tbc
 train_model <- function(
   df,
+  id_train,
+  batch_size,
   window_size_ms,
-  window_stride_ms,
-  ds_train,
-  ds_validation,
+  window_stride_ms
 ) {
   model <- define_model(window_size_ms,
                         window_stride_ms)
+
+  ds_train <- ds_train(
+    df = df,
+    id_train = id_train,
+    batch_size = batch_size,
+    window_size_ms = window_size_ms,
+    window_stride_ms = window_stride_ms,
+    shuffle = TRUE
+  )
+
+  ds_validation <- ds_validation(
+    df = df,
+    id_train = id_train,
+    batch_size = batch_size,
+    window_size_ms = window_size_ms,
+    window_stride_ms = window_stride_ms,
+    shuffle = FALSE
+  )
 
   compile(
     model,
@@ -254,8 +295,7 @@ train_model <- function(
     metrics = c('accuracy')
   )
 
-  fit(
-    object = model,
+  model %>% fit_generator(
     generator = ds_train,
     steps_per_epoch = 0.7*nrow(df)/32,
     epochs = 10,
@@ -265,120 +305,76 @@ train_model <- function(
   model
 }
 
-#' @title Test accuracy.
-#' @description Compute the classification accuracy of a trained Keras model
-#'   on the test dataset.
-#' @return Classification accuracy of a trained Keras model on the test
-#'   dataset.
-#' @inheritParams define_model
+#' @title Apply the trained model on validation dataset
+#' @description ...
+#' @details ...
+#' @return Confusion matrix
+#' @inheritParams train_model
+#' @inheritParams
 #' @examples
-#' library(keras)
-test_accuracy <- function(churn_data, churn_recipe, model) {
-  testing_data <- bake(churn_recipe, testing(churn_data))
-  x_test_tbl <- testing_data %>%
-    select(-Churn) %>%
-    as.matrix()
-  y_test_vec <- testing_data %>%
-    select(Churn) %>%
-    pull()
-  yhat_keras_class_vec <- model %>%
-    predict(x_test_tbl) %>%
-    `>`(0.5) %>%
-    as.integer() %>%
-    as.factor() %>%
-    fct_recode(yes = "1", no = "0")
-  yhat_keras_prob_vec <-
-    model %>%
-    predict(x_test_tbl) %>%
-    as.vector()
-  test_truth <- y_test_vec %>%
-    as.factor() %>%
-    fct_recode(yes = "1", no = "0")
-  estimates_keras_tbl <- tibble(
-    truth = test_truth,
-    estimate = yhat_keras_class_vec,
-    class_prob = yhat_keras_prob_vec
-  )
-  estimates_keras_tbl %>%
-    conf_mat(truth, estimate) %>%
-    summary() %>%
-    filter(.metric == "accuracy") %>%
-    pull(.estimate)
-}
-
-#' @title Benchmark a Keras model.
-#' @description Define, compile, and train a Keras model on the training
-#'   dataset. Then, benchmark it on the test dataset and return summaries.
-#' @details The first time you run Keras in an R session,
-#'   TensorFlow usually prints verbose ouput such as
-#'   "Your CPU supports instructions that this TensorFlow binary was not compiled to use:"
-#'   and "OMP: Info #171: KMP_AFFINITY:". You can safely ignore these messages.
-#' @return A data frame with one row and the following columns:
-#'   * `accuracy`: classification accuracy on the test dataset.
-#'   * `units1`: number of neurons in layer 1.
-#'   * `units2`: number of neurons in layer 2.
-#'   * `act1`: number of neurons in layer 1.
-#'   * `act2`: number of neurons in layer 2.
-#'   * `act3`: number of neurons in layer 3.
-#' @inheritParams define_model
-#' @inheritParams test_accuracy
-#' @examples
-#' library(keras)
-#' library(recipes)
-#' library(rsample)
-#' library(tidyverse)
-#' data <- split_data("data/customer_churn.csv")
-#' recipe <- prepare_recipe(data)
-#' test_model(data, recipe, 16, 16, "relu", "relu", "sigmoid")
-test_model <- function(
-  churn_data,
-  churn_recipe,
-  units1 = 16,
-  units2 = 16,
-  act1 = "relu",
-  act2 = "relu",
-  act3 = "sigmoid"
+predicting <- function(
+  df,
+  id_train,
+  batch_size,
+  window_size_ms,
+  window_stride_ms,
+  model
 ) {
-  model <- train_model(churn_recipe, units1, units2, act1, act2, act3)
-  accuracy <- test_accuracy(churn_data, churn_recipe, model)
-  tibble(
-    accuracy = accuracy,
-    units1 = units1,
-    units2 = units2,
-    act1 = act1,
-    act2 = act2,
-    act3 = act3
+  ds_validation <- ds_validation(
+    df = df,
+    id_train = id_train,
+    batch_size = batch_size,
+    window_size_ms = window_size_ms,
+    window_stride_ms = window_stride_ms,
+    shuffle = FALSE
   )
+
+  df_validation <- df[-pull(id_train),]
+  n_steps <- nrow(df_validation)/32 + 1
+
+  predictions <- keras::predict_generator(
+    model,
+    ds_validation,
+    steps = n_steps
+  )
+
+  classes <- apply(predictions, 1, which.max) - 1
+
+  confusion_mat <- df_validation %>%
+    mutate(pred_class_id = head(classes, nrow(df_validation))) %>%
+    left_join(
+      df_validation %>% distinct(class_id, class) %>% rename(pred_class = class),
+      by = c("pred_class_id" = "class_id")
+    ) %>%
+    mutate(correct = pred_class == class)
 }
 
-#' @title Retrain the best model.
-#' @description After we find the model with the best accuracy,
-#'   retrain it and return the trained model given a row of output
-#'   from [test_model()].
-#' @details The first time you run Keras in an R session,
-#'   TensorFlow usually prints verbose ouput such as
-#'   "Your CPU supports instructions that this TensorFlow binary was not compiled to use:"
-#'   and "OMP: Info #171: KMP_AFFINITY:". You can safely ignore these messages.
-#' @return A trained Keras model.
-#' @inheritParams best_run A one-row data frame from [test_model()]
-#'   corresponding to the best model.
+#' @title Visualization
+#' @description Creates an alluvial plot
+#' @details A nice visualization of the confusion matrix is to create an alluvial diagram:
+#' @return Plot
+#' @inheritParams predicting
 #' @inheritParams test_accuracy
 #' @examples
-#' library(keras)
-#' library(recipes)
-#' library(rsample)
-#' library(tidyverse)
-#' data <- split_data("data/customer_churn.csv")
-#' recipe <- prepare_recipe(data)
-#' run <- test_model(data, recipe, 16, 16, "relu", "relu", "sigmoid")
-#' train_best_model(run, recipe)
-train_best_model <- function(best_run, churn_recipe) {
-  train_model(
-    churn_recipe,
-    best_run$units1,
-    best_run$units2,
-    best_run$act1,
-    best_run$act2,
-    best_run$act3
-  )
+#' library(alluvial)
+#' tbc
+alluv_plot <- function(conf_mat, path) {
+  x <- conf_mat %>%
+    count(pred_class, class, correct)
+
+  save_plot <- function(x, path) {
+    png('output/alluvial.png') #width = 1920,height = 1080
+    invisible(x)
+    invisible(dev.off())
+  }
+
+  alluvial(
+    x %>% select(class, pred_class),
+    freq = x$n,
+    col = ifelse(x$correct, "lightblue", "red"),
+    border = ifelse(x$correct, "lightblue", "red"),
+    alpha = 0.6,
+    hide = x$n < 20
+  ) %>%
+    save_plot(x = ., path)
 }
