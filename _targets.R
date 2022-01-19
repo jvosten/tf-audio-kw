@@ -22,7 +22,7 @@ reticulate::use_condaenv(condaenv = "tf-audio", required = TRUE)
 list(
   tar_target(
     data_path,
-    "data/speech_commands_v0.01/",
+    "./data/speech_commands_v0.01/",
     format = "file"
   ),
   # Preparation for the data generator
