@@ -26,7 +26,8 @@ main <- function() {
       "tarchetypes",
       "tfdatasets",
       "tensorflow",
-      "targets"
+      "targets",
+      "reticulate"
     )
 
     installed_pkgs <- pkgs %in% rownames(installed.packages())

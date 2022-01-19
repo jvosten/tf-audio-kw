@@ -17,12 +17,12 @@ tar_option_set(
     "fs"
   )
 )
-#reticulate::use_condaenv(condaenv = "tf-audio", required = TRUE)
+reticulate::use_condaenv(condaenv = "tf-audio", required = TRUE)
 
 list(
   tar_target(
     data_path,
-    "~/src/dev/r/kenwave/data/speech_commands_v0.01/",
+    "data/speech_commands_v0.01/",
     format = "file"
   ),
   # Preparation for the data generator
